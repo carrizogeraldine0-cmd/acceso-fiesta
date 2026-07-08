@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lector de Accesos Pro</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #f4f4f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; justify-content: center; overflow: hidden; }
+        .app-window { width: 100%; max-width: 420px; height: 100vh; background: #fff; display: flex; flex-direction: column; position: relative; box-shadow: 0 8px 24px rgba(0,0,0,0.04); }
+        .header { padding: 24px 20px; text-align: center; border-bottom: 1px solid #f0f0f5; background: #fff; }
+        .header h1 { font-size: 20px; font-weight: 700; color: #1d1d1f; letter-spacing: -0.5px; }
+        .header p { font-size: 13px; color: #86868b; margin-top: 4px; }
+        .camera-box { flex: 1; display: flex; align-items: center; justify-content: center; background: #fafafa; padding: 20px; position: relative; }
+        #reader { width: 100%; max-width: 340px; border: none !important; background: #000; border-radius: 24px; overflow: hidden; }
+        .card-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: #fff; padding: 28px 24px; border-radius: 32px 32px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,0.08); transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 10; }
+        .card-overlay.active { transform: translateY(0); }
+        .handle { width: 40px; height: 5px; background: #e5e5ea; border-radius: 3px; margin: -12px auto 20px auto; }
+        .status-badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 14px; }
+        .status-badge.valido { background: #e8f5e9; color: #2e7d32; }
+        .status-badge.error { background: #ffebee; color: #c62828; }
+        .guest-name { font-size: 22px; font-weight: 700; color: #1d1d1f; margin-bottom: 6px; }
+        .guest-info { font-size: 15px; color: #515154; margin-bottom: 24px; }
+        .btn-action { width: 100%; padding: 16px; border: none; border-radius: 16px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .btn-action.success { background: #0071e3; color: #fff; }
+        .btn-action.close { background: #f5f5f7; color: #1d1d1f; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="app-window">
+    <div class="header">
+        <h1>Control de Acceso</h1>
+        <p>Apunta al código QR de la invitación</p>
+    </div>
+    <div class="camera-box">
+        <div id="reader"></div>
+    </div>
+    <div id="result-card" class="card-overlay">
+        <div class="handle"></div>
+        <span id="badge" class="status-badge valido">Acceso Permitido</span>
+        <div id="card-content"></div>
+        <button id="btn-primary" class="btn-action success" onclick="registrarIngreso()">Registrar Entrada</button>
+        <button class="btn-action close" onclick="cerrarTarjeta()">Cerrar</button>
+    </div>
+</div>
+
+<script>
+    const de_invitados = {
+  "INV-001": {
+    "nombre": "Familia Carrizo Peredo",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-002": {
+    "nombre": "Luis Fernando",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-003": {
+    "nombre": "Ana maria diaz",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-004": {
+    "nombre": "Hugo Mestizo",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-005": {
+    "nombre": "Dario Monroy",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-006": {
+    "nombre": "Gabriela pozos Aguilar",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-007": {
+    "nombre": "Dora Beatriz",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-008": {
+    "nombre": "MARLENE L.MEDEL POZOS",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-009": {
+    "nombre": "Zaira Gomez Zuñiga",
+    "pases": 5,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-010": {
+    "nombre": "Aidee Avila Olivares",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-011": {
+    "nombre": "Artemio carrizo montemiria",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-012": {
+    "nombre": "Freya Karicha Viveros",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-013": {
+    "nombre": "Dulce Maria Mendoza Vazquez",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-014": {
+    "nombre": "Armando Carrizo Cuavichi",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-015": {
+    "nombre": "Laura Melchor Olarte",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-016": {
+    "nombre": "Sneyhli peredo pozos",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-017": {
+    "nombre": "Berenice Peredo Jimenez",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-018": {
+    "nombre": "Lucia Suarez Brindis",
+    "pases": 5,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-019": {
+    "nombre": "Karla Iris Avalos",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-020": {
+    "nombre": "Monica Carrizo",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-021": {
+    "nombre": "Esmeralda Baez Garcia",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-022": {
+    "nombre": "Mauricio olivares Sanchez",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-023": {
+    "nombre": "Sandra Janeth Hernandez Burgos",
+    "pases": 6,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-024": {
+    "nombre": "Magali Montemira",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-025": {
+    "nombre": "Carmen Vazquez",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-026": {
+    "nombre": "Luis Antonio Izaguirre",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-027": {
+    "nombre": "Fabiola yaret yoval carrizo",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-028": {
+    "nombre": "Norma lilia",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-029": {
+    "nombre": "Karina Yoval",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-030": {
+    "nombre": "Alejandro Suarez Cuaviche",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-031": {
+    "nombre": "ROGELIO GONZALEZ XOLO",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-032": {
+    "nombre": "Maribel Alarcon Jarillo",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-033": {
+    "nombre": "Remedios peredo",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-034": {
+    "nombre": "Fernando Carreon",
+    "pases": 5,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-035": {
+    "nombre": "Diego Cordoba",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-036": {
+    "nombre": "Luis Osvaldo carrizo baez",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-037": {
+    "nombre": "Leo Melchor",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-038": {
+    "nombre": "Maria Julieta Cordoba Ortiz",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-039": {
+    "nombre": "Ana Hernandez",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-040": {
+    "nombre": "Benito Olivares",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-041": {
+    "nombre": "Estrella Marti­nez",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-042": {
+    "nombre": "Rosy Olivares Tlaxcalteco",
+    "pases": 6,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-043": {
+    "nombre": "Karen Pozos Tlaxcalteco",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-044": {
+    "nombre": "Fernanda Juarez",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-045": {
+    "nombre": "Eric Daniel",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-046": {
+    "nombre": "Octavio Pozos",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-047": {
+    "nombre": "Lucia",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-048": {
+    "nombre": "Mercedes",
+    "pases": 5,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-049": {
+    "nombre": "Blanca Imelda Cruz Hermenegildo",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-050": {
+    "nombre": "Karla Sayany Alarcon Carrizo",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-051": {
+    "nombre": "Maricruz Suarez",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-052": {
+    "nombre": "Moncerrat",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-053": {
+    "nombre": "Claudia Ivonne Medel Pozos",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-054": {
+    "nombre": "Jesus Antonio Aleman Montiel",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-055": {
+    "nombre": "Aldwin Peredo Jimenez",
+    "pases": 5,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-056": {
+    "nombre": "Hector Allende",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-057": {
+    "nombre": "Maria del Carmen Itza Cordoba",
+    "pases": 6,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-058": {
+    "nombre": "Michelle Denisse",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-059": {
+    "nombre": "Sofia Leon",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-060": {
+    "nombre": "liliana Garci­a",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-061": {
+    "nombre": "Ana Delia Carrizo Itza",
+    "pases": 5,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-062": {
+    "nombre": "Dulce Maria Aguilera Zarate",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-063": {
+    "nombre": "Ana Margarita",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-064": {
+    "nombre": "Antonio",
+    "pases": 6,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-065": {
+    "nombre": "ADRIANA CARRIZO",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-066": {
+    "nombre": "Itzel Rivera",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-067": {
+    "nombre": "Oscar Tepetla",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-068": {
+    "nombre": "Diego Carrizo",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-069": {
+    "nombre": "Denise Alcazar Ordaz",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-070": {
+    "nombre": "SERGIO CARRIZO",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-071": {
+    "nombre": "Manuel Salinas",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-072": {
+    "nombre": "Yara Mareli Sayago Luna",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-073": {
+    "nombre": "Abdiel Rodriguez",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-074": {
+    "nombre": "Israel Carrizo",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-075": {
+    "nombre": "Francisco Carrizo",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-076": {
+    "nombre": "Antonio Carrizo",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-077": {
+    "nombre": "Noe Carrizo",
+    "pases": 5,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-078": {
+    "nombre": "Hugo Olivares",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-079": {
+    "nombre": "Marcela Rolon",
+    "pases": 6,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-080": {
+    "nombre": "Gloria Pozos",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-081": {
+    "nombre": "Janeth Pozos",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-082": {
+    "nombre": "Steve",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-083": {
+    "nombre": "Juan Carlos Montemira",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-084": {
+    "nombre": "Luisa",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-085": {
+    "nombre": "Mary",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-086": {
+    "nombre": "Marisa",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-087": {
+    "nombre": "Jesus",
+    "pases": 3,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-088": {
+    "nombre": "Josue",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-089": {
+    "nombre": "Manuel Sanchez Garcia",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-090": {
+    "nombre": "Alejandro Gonzales",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-091": {
+    "nombre": "Leticia Avila",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-092": {
+    "nombre": "Nancy",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-093": {
+    "nombre": "Roxana Tlaxcalteco",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-094": {
+    "nombre": "Yedit Tlaxcalteco",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-095": {
+    "nombre": "Marisol",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-096": {
+    "nombre": "Abel Cosme",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-097": {
+    "nombre": "Manuel Cabrera",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-098": {
+    "nombre": "Helida",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-099": {
+    "nombre": "Gualberto Tlaxcalteco",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-100": {
+    "nombre": "Efrain Baez",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-101": {
+    "nombre": "Griselda Avila",
+    "pases": 2,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-102": {
+    "nombre": "Edwin Suarez",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-103": {
+    "nombre": "Marco Ivan",
+    "pases": 1,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-107": {
+    "nombre": "Total de invitados",
+    "pases": 296,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  },
+  "INV-108": {
+    "nombre": "Quedan lugares:",
+    "pases": 4,
+    "ingresados": 0,
+    "estatus": "Pendiente"
+  }
+};
+    let usuarioActualId = null;
+    let html5QrcodeScanner = null;
+
+    function inicializarEscaner() {
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true });
+        html5QrcodeScanner.render(onScanSuccess);
+    }
+
+    function onScanSuccess(decodedText) {
+        try {
+            let url = new URL(decodedText);
+            let id = url.searchParams.get("id");
+            if (id && de_invitados[id]) { mostrarTarjeta(id); }
+            else { mostrarError("Código Desconocido", "Este QR no pertenece al evento."); }
+        } catch(e) {
+            if(de_invitados[decodedText]) { mostrarTarjeta(decodedText); }
+            else { mostrarError("QR Inválido", "El formato escaneado no es correcto."); }
+        }
+    }
+
+    function mostrarTarjeta(id) {
+        usuarioActualId = id;
+        const info = de_invitados[id];
+        const badge = document.getElementById("badge");
+        document.getElementById("btn-primary").style.display = "block";
+        badge.className = "status-badge valido";
+        badge.innerText = "Pase Confirmado";
+        
+        document.getElementById("card-content").innerHTML = `
+            <div class="guest-name">${info.nombre}</div>
+            <div class="guest-info">Pases asignados: <strong>${info.pases}</strong></div>
+        `;
+        document.getElementById("result-card").classList.add("active");
+    }
+
+    function mostrarError(titulo, detalle) {
+        document.getElementById("btn-primary").style.display = "none";
+        document.getElementById("badge").className = "status-badge error";
+        document.getElementById("badge").innerText = "Error";
+        document.getElementById("card-content").innerHTML = `
+            <div class="guest-name">${titulo}</div>
+            <div class="guest-info">${detalle}</div>
+        `;
+        document.getElementById("result-card").classList.add("active");
+    }
+
+    function registrarIngreso() {
+        if(usuarioActualId && de_invitados[usuarioActualId]) {
+            alert(`¡Entrada Registrada!\nTitular: ${de_invitados[usuarioActualId].nombre}`);
+            cerrarTarjeta();
+        }
+    }
+
+    function cerrarTarjeta() {
+        document.getElementById("result-card").classList.remove("active");
+        usuarioActualId = null;
+    }
+
+    window.onload = inicializarEscaner;
+</script>
+</body>
+</html>
